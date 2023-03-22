@@ -252,6 +252,36 @@ impl<D> Wallet<D> {
         self.keychain_tracker.txout_index.keychains()
     }
 
+    // TODO can this return an iterator instead of a single value?
+    // TODO remove get_address when all variants are replaced
+    /// Return the next unrevealed derived address using the specified keychain. If none of the
+    /// keys in the keychain are derivable (i.e. WIF or descriptor does not end with /*) then the
+    /// same address will always be returned.
+    pub fn reveal_next_address(
+        &mut self,
+        keychain: &KeychainKind,
+    ) -> Result<AddressInfo, D::WriteError>
+    where
+        D: persist::PersistBackend<KeychainKind, ConfirmationTime>,
+    {
+        // reveal the next index and corresponding script public key
+        let ((index, spk), changeset) =
+            self.keychain_tracker.txout_index.reveal_next_spk(&keychain);
+
+        // persist derivation addition changeset
+        self.persist.stage(changeset.into());
+        self.persist.commit()?;
+
+        let address = Address::from_script(&spk, self.network)
+            .expect("descriptor must only generate valid scripts");
+        let address_info = AddressInfo {
+            index,
+            address,
+            keychain: keychain.clone(),
+        };
+        Ok(address_info)
+    }
+
     /// Return a derived address using the external descriptor, see [`AddressIndex`] for
     /// available address index selection strategies. If none of the keys in the descriptor are derivable
     /// (i.e. does not end with /*) then the same address will always be returned for any [`AddressIndex`].

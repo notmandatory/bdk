@@ -10,7 +10,7 @@
 // licenses.
 
 use alloc::boxed::Box;
-use core::convert::AsRef;
+// use core::convert::AsRef;
 use core::ops::Sub;
 
 use bdk_chain::ConfirmationTime;
@@ -28,24 +28,24 @@ pub enum KeychainKind {
     Internal = 1,
 }
 
-impl KeychainKind {
-    /// Return [`KeychainKind`] as a byte
-    pub fn as_byte(&self) -> u8 {
-        match self {
-            KeychainKind::External => b'e',
-            KeychainKind::Internal => b'i',
-        }
-    }
-}
-
-impl AsRef<[u8]> for KeychainKind {
-    fn as_ref(&self) -> &[u8] {
-        match self {
-            KeychainKind::External => b"e",
-            KeychainKind::Internal => b"i",
-        }
-    }
-}
+// impl KeychainKind {
+//     /// Return [`KeychainKind`] as a byte
+//     pub fn as_byte(&self) -> u8 {
+//         match self {
+//             KeychainKind::External => b'e',
+//             KeychainKind::Internal => b'i',
+//         }
+//     }
+// }
+//
+// impl AsRef<[u8]> for KeychainKind {
+//     fn as_ref(&self) -> &[u8] {
+//         match self {
+//             KeychainKind::External => b"e",
+//             KeychainKind::Internal => b"i",
+//         }
+//     }
+// }
 
 /// Fee rate
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]

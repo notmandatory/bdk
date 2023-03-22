@@ -3307,3 +3307,45 @@ fn test_tx_cancellation() {
         .unwrap();
     assert_eq!(change_derivation_4, (KeychainKind::Internal, 2));
 }
+
+#[test]
+/// Verify new derived addresses match those derived by the same core descriptor wallet
+fn test_reveal_next_wildcard_address() {
+    let mut wallet = Wallet::new_no_persist("wpkh(tpubD6NzVbkrYhZ4WWGhiCNyq7EUNpoFdcVrxB4SqRUv55oSXHPAt47E5Et1xYM8S5ZqtwPuPZ5j2s1pFALLGg9uK5emMbKqdi8r2B2SRx9oQSk/*)#v7tylpae", None, Network::Regtest).unwrap();
+
+    let addr0 = wallet.reveal_next_address(&KeychainKind::External).unwrap();
+    let expected_addr0 = AddressInfo {
+        index: 0,
+        address: Address::from_str("bcrt1q4ycgjh940hazv9jdwu9zm9avgrnk7twj8nc9rx").unwrap(),
+        keychain: KeychainKind::External,
+    };
+    assert_eq!(addr0, expected_addr0);
+    let addr1 = wallet.reveal_next_address(&KeychainKind::External).unwrap();
+    let expected_addr1 = AddressInfo {
+        index: 1,
+        address: Address::from_str("bcrt1qe02vzfh04uwtua3xdgdrqra9zhmm5twrxqexz7").unwrap(),
+        keychain: KeychainKind::External,
+    };
+    assert_eq!(addr1, expected_addr1);
+}
+
+#[test]
+/// Verify new derived address matches the one derived by the same core descriptor wallet
+fn test_reveal_next_fixed_address() {
+    let mut wallet = Wallet::new_no_persist("wpkh(tpubD6NzVbkrYhZ4WWGhiCNyq7EUNpoFdcVrxB4SqRUv55oSXHPAt47E5Et1xYM8S5ZqtwPuPZ5j2s1pFALLGg9uK5emMbKqdi8r2B2SRx9oQSk/0)#3dwhzzmg", None, Network::Regtest).unwrap();
+
+    let addr0 = wallet.reveal_next_address(&KeychainKind::External).unwrap();
+    let expected_addr0 = AddressInfo {
+        index: 0,
+        address: Address::from_str("bcrt1q4ycgjh940hazv9jdwu9zm9avgrnk7twj8nc9rx").unwrap(),
+        keychain: KeychainKind::External,
+    };
+    assert_eq!(addr0, expected_addr0);
+    let addr1 = wallet.reveal_next_address(&KeychainKind::External).unwrap();
+    let expected_addr1 = AddressInfo {
+        index: 0,
+        address: Address::from_str("bcrt1q4ycgjh940hazv9jdwu9zm9avgrnk7twj8nc9rx").unwrap(),
+        keychain: KeychainKind::External,
+    };
+    assert_eq!(addr1, expected_addr1);
+}
