@@ -1,10 +1,12 @@
 #![doc = include_str!("../README.md")]
+// only enables the `doc_cfg` feature when the `docsrs` configuration attribute is defined
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 pub mod persist;
 mod schema;
 pub mod store;
-#[cfg(feature = "bdk_wallet")]
-#[cfg_attr(docsrs, doc(cfg(feature = "bdk_wallet")))]
+#[cfg(feature = "wallet")]
+#[cfg_attr(docsrs, doc(cfg(feature = "wallet")))]
 pub mod wallet;
 
 use bdk_chain::bitcoin::Network;
