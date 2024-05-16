@@ -4,6 +4,7 @@ use assert_matches::assert_matches;
 use bdk_chain::collections::BTreeMap;
 use bdk_chain::COINBASE_MATURITY;
 use bdk_chain::{BlockId, ConfirmationTime};
+use bdk_sqlite_store::store::Store;
 use bdk_wallet::descriptor::{calc_checksum, IntoWalletDescriptor};
 use bdk_wallet::psbt::PsbtUtils;
 use bdk_wallet::signer::{SignOptions, SignerError};
@@ -66,16 +67,14 @@ fn receive_output_in_latest_block(wallet: &mut Wallet, value: u64) -> OutPoint {
 // OP_PUSH.
 const P2WPKH_FAKE_WITNESS_SIZE: usize = 106;
 
-const DB_MAGIC: &[u8] = &[0x21, 0x24, 0x48];
-
 #[test]
 fn load_recovers_wallet() {
     let temp_dir = tempfile::tempdir().expect("must create tempdir");
-    let file_path = temp_dir.path().join("store.db");
+    let file_path = temp_dir.path().join("store.sqlite");
 
     // create new wallet
     let wallet_spk_index = {
-        let db = bdk_file_store::Store::create_new(DB_MAGIC, &file_path).expect("must create db");
+        let db = Store::new(&file_path).expect("must create db");
         let mut wallet = Wallet::new(get_test_tr_single_sig_xprv(), None, db, Network::Testnet)
             .expect("must init wallet");
 
@@ -85,7 +84,7 @@ fn load_recovers_wallet() {
 
     // recover wallet
     {
-        let db = bdk_file_store::Store::open(DB_MAGIC, &file_path).expect("must recover db");
+        let db = Store::new(&file_path).expect("must recover db");
         let wallet = Wallet::load(db).expect("must recover wallet");
         assert_eq!(wallet.network(), Network::Testnet);
         assert_eq!(
@@ -108,7 +107,7 @@ fn load_recovers_wallet() {
 
     // `new` can only be called on empty db
     {
-        let db = bdk_file_store::Store::open(DB_MAGIC, &file_path).expect("must recover db");
+        let db = Store::new(&file_path).expect("must recover db");
         let result = Wallet::new(get_test_tr_single_sig_xprv(), None, db, Network::Testnet);
         assert!(matches!(result, Err(NewError::NonEmptyDatabase)));
     }
@@ -121,8 +120,7 @@ fn new_or_load() {
 
     // init wallet when non-existent
     let wallet_keychains: BTreeMap<_, _> = {
-        let db = bdk_file_store::Store::open_or_create_new(DB_MAGIC, &file_path)
-            .expect("must create db");
+        let db = Store::new(&file_path).expect("must create db");
         let wallet = Wallet::new_or_load(get_test_wpkh(), None, db, Network::Testnet)
             .expect("must init wallet");
         wallet.keychains().map(|(k, v)| (*k, v.clone())).collect()
@@ -130,8 +128,7 @@ fn new_or_load() {
 
     // wrong network
     {
-        let db =
-            bdk_file_store::Store::open_or_create_new(DB_MAGIC, &file_path).expect("must open db");
+        let db = Store::new(&file_path).expect("must open db");
         let err = Wallet::new_or_load(get_test_wpkh(), None, db, Network::Bitcoin)
             .expect_err("wrong network");
         assert!(
@@ -153,8 +150,7 @@ fn new_or_load() {
         let got_blockhash =
             bitcoin::blockdata::constants::genesis_block(Network::Testnet).block_hash();
 
-        let db =
-            bdk_file_store::Store::open_or_create_new(DB_MAGIC, &file_path).expect("must open db");
+        let db = Store::new(&file_path).expect("must open db");
         let err = Wallet::new_or_load_with_genesis_hash(
             get_test_wpkh(),
             None,
@@ -182,8 +178,7 @@ fn new_or_load() {
             .unwrap()
             .0;
 
-        let db =
-            bdk_file_store::Store::open_or_create_new(DB_MAGIC, &file_path).expect("must open db");
+        let db = Store::new(&file_path).expect("must open db");
         let err = Wallet::new_or_load(exp_descriptor, None, db, Network::Testnet)
             .expect_err("wrong external descriptor");
         assert!(
@@ -202,8 +197,7 @@ fn new_or_load() {
         let exp_descriptor = Some(get_test_tr_single_sig());
         let got_descriptor = None;
 
-        let db =
-            bdk_file_store::Store::open_or_create_new(DB_MAGIC, &file_path).expect("must open db");
+        let db = Store::new(&file_path).expect("must open db");
         let err = Wallet::new_or_load(get_test_wpkh(), exp_descriptor, db, Network::Testnet)
             .expect_err("wrong internal descriptor");
         assert!(
@@ -219,8 +213,7 @@ fn new_or_load() {
 
     // all parameters match
     {
-        let db =
-            bdk_file_store::Store::open_or_create_new(DB_MAGIC, &file_path).expect("must open db");
+        let db = Store::new(&file_path).expect("must open db");
         let wallet = Wallet::new_or_load(get_test_wpkh(), None, db, Network::Testnet)
             .expect("must recover wallet");
         assert_eq!(wallet.network(), Network::Testnet);

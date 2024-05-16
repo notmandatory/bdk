@@ -19,7 +19,9 @@ use bdk_chain::{
 
 /// Persists [`ChangeSet`] data in to a relational schema based SQLite database file.
 ///
-/// The changesets loaded or stored represent changes to keychain and blockchain data.
+/// The changesets loaded or stored represent changes to keychain and blockchain data. If the
+/// keychain (K) is a simple enum without variant fields you must enable the
+/// [serde internal tag](https://serde.rs/enum-representations.html#internally-tagged) feature.
 #[derive(Debug)]
 pub struct Store<K: Send, A: Send> {
     // A rusqlite connection to the SQLite database. Uses a Mutex for thread safety.
