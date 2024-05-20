@@ -6,7 +6,7 @@ use bdk_wallet::{
     KeychainKind, SignOptions, Wallet,
 };
 
-use bdk_sqlite_store::store::Store;
+use bdk_sqlite_store::{rusqlite::Connection, Store};
 
 const SEND_AMOUNT: Amount = Amount::from_sat(5000);
 const STOP_GAP: usize = 50;
@@ -15,7 +15,8 @@ const PARALLEL_REQUESTS: usize = 5;
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     let db_path = "bdk-esplora-async-example.sqlite";
-    let db = Store::new(db_path)?;
+    let conn = Connection::open(db_path)?;
+    let db = Store::new(conn)?;
     let external_descriptor = "wpkh(tprv8ZgxMBicQKsPdy6LMhUtFHAgpocR8GC6QmwMSFpZs7h6Eziw3SpThFfczTDh5rW2krkqffa11UpX3XkeTTB2FvzZKWXqPY54Y6Rq4AQ5R8L/84'/1'/0'/0/*)";
     let internal_descriptor = "wpkh(tprv8ZgxMBicQKsPdy6LMhUtFHAgpocR8GC6QmwMSFpZs7h6Eziw3SpThFfczTDh5rW2krkqffa11UpX3XkeTTB2FvzZKWXqPY54Y6Rq4AQ5R8L/84'/1'/0'/1/*)";
 

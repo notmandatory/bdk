@@ -2,7 +2,7 @@
 
 This is a simple [SQLite] relational database schema backed implementation of [`PersistBackend`](bdk_persist::PersistBackend).
 
-The main structure is [`Store`](store::Store) which works with any [`bdk_chain`] based changesets to persist data into a SQLite database file. 
+The main structure is `Store` which works with any [`bdk_chain`] based changesets to persist data into a SQLite database file. 
 
 To use `Store` with [`Wallet`](bdk_wallet::wallet::Wallet) enable the `wallet` feature.
 

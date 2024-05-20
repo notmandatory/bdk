@@ -4,7 +4,7 @@
 
 pub mod persist;
 mod schema;
-pub mod store;
+mod store;
 #[cfg(feature = "wallet")]
 #[cfg_attr(docsrs, doc(cfg(feature = "wallet")))]
 pub mod wallet;
@@ -13,6 +13,7 @@ use bdk_chain::bitcoin::Network;
 use bdk_chain::{indexed_tx_graph, keychain, local_chain, Anchor, Append};
 pub use rusqlite;
 use serde::{Deserialize, Serialize};
+pub use store::Store;
 
 /// Change set representing changes to [`local_chain::ChangeSet`] and [`indexed_tx_graph::ChangeSet`].
 ///
