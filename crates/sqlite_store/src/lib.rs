@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// This structure is used to persist data with the SQLite based [`store::Store`] provided by this crate.
 #[derive(Clone, Debug, PartialEq)]
-pub struct ChangeSet<K: Ord + for<'de> Deserialize<'de> + Serialize, A: Anchor> {
+pub struct ChangeSet<K, A> {
     pub network: Option<Network>,
     pub chain: local_chain::ChangeSet,
     pub tx_graph: indexed_tx_graph::ChangeSet<A, keychain::ChangeSet<K>>,
