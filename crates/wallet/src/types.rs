@@ -20,7 +20,6 @@ use serde::{Deserialize, Serialize};
 
 /// Types of keychains
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd)]
-#[serde(tag = "type")]
 pub enum KeychainKind {
     /// External keychain, used for deriving recipient addresses.
     External = 0,

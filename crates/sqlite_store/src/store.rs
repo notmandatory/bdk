@@ -7,7 +7,6 @@ use rusqlite::{named_params, Connection};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::marker::PhantomData;
-use std::path::Path;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
@@ -36,26 +35,8 @@ where
     A: Anchor + for<'de> Deserialize<'de> + Serialize + Send,
 {
     /// Creates a new store from a [`Path`].
-    ///
-    /// The file must be able to be opened with read and write permissions.
-    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, rusqlite::Error> {
-        let mut conn = Connection::open(path)?;
+    pub fn new(mut conn: Connection) -> Result<Self, rusqlite::Error> {
         Self::migrate(&mut conn)?;
-
-        Ok(Self {
-            conn: Mutex::new(conn),
-            keychain_marker: Default::default(),
-            anchor_marker: Default::default(),
-        })
-    }
-
-    /// Creates a new in-memory, not persisted database store.
-    ///
-    /// This is primarily used for testing.
-    pub fn new_memory() -> Result<Self, rusqlite::Error> {
-        let mut conn = Connection::open_in_memory()?;
-        Self::migrate(&mut conn)?;
-
         Ok(Self {
             conn: Mutex::new(conn),
             keychain_marker: Default::default(),
@@ -261,13 +242,13 @@ where
         db_transaction: &rusqlite::Transaction,
     ) -> Result<BTreeMap<K, Descriptor<DescriptorPublicKey>>, Error> {
         let mut select_keychains_added_stmt = db_transaction
-            .prepare_cached("SELECT json_extract(keychain, '$'), descriptor FROM keychain")
+            .prepare_cached("SELECT json(keychain), descriptor FROM keychain")
             .expect("select keychains statement");
 
         let keychains = select_keychains_added_stmt
             .query_map([], |row| {
                 let keychain = row.get_unwrap::<usize, String>(0);
-                let keychain: K = serde_json::from_str(keychain.as_str()).expect("keychain");
+                let keychain = serde_json::from_str::<K>(keychain.as_str()).expect("keychain");
                 let descriptor = row.get_unwrap::<usize, String>(1);
                 let descriptor = Descriptor::from_str(descriptor.as_str()).expect("descriptor");
                 Ok((keychain, descriptor))
@@ -487,7 +468,7 @@ where
     ) -> Result<BTreeSet<(A, Txid)>, Error> {
         // serde_json::from_str
         let mut select_anchor_stmt = db_transaction
-            .prepare_cached("SELECT block_hash, json_extract(anchor, '$'), txid FROM anchor_tx")
+            .prepare_cached("SELECT block_hash, json(anchor), txid FROM anchor_tx")
             .expect("select anchor statement");
         let anchors = select_anchor_stmt
             .query_map([], |row| {
@@ -626,7 +607,8 @@ mod test {
     }
 
     #[test]
-    fn insert_and_load_aggregate_changesets_with_confirmation_time_height_anchor() {
+    fn insert_and_load_aggregate_changesets_with_confirmation_time_height_anchor(
+    ) -> anyhow::Result<()> {
         let (test_changesets, agg_test_changesets) =
             create_test_changesets(&|height, time, hash| ConfirmationTimeHeightAnchor {
                 confirmation_height: height,
@@ -634,11 +616,9 @@ mod test {
                 anchor_block: (height, hash).into(),
             });
 
-        let mut store = Store::<Keychain, ConfirmationTimeHeightAnchor>::new_memory()
+        let conn = Connection::open_in_memory()?;
+        let mut store = Store::<Keychain, ConfirmationTimeHeightAnchor>::new(conn)
             .expect("create new memory db store");
-        // let mut store =
-        //     Store::<Keychain, ConfirmationTimeHeightAnchor>::new(Path::new("test_agg.sqlite"))
-        //         .expect("create new file db store");
 
         test_changesets.iter().for_each(|changeset| {
             store.write_changes(changeset).expect("write changeset");
@@ -647,21 +627,21 @@ mod test {
         let agg_changeset = store.load_from_persistence().expect("aggregated changeset");
 
         assert_eq!(agg_changeset, Some(agg_test_changesets));
+        Ok(())
     }
 
     #[test]
-    fn insert_and_load_aggregate_changesets_with_confirmation_height_anchor() {
+    fn insert_and_load_aggregate_changesets_with_confirmation_height_anchor() -> anyhow::Result<()>
+    {
         let (test_changesets, agg_test_changesets) =
             create_test_changesets(&|height, _time, hash| ConfirmationHeightAnchor {
                 confirmation_height: height,
                 anchor_block: (height, hash).into(),
             });
 
-        let mut store = Store::<Keychain, ConfirmationHeightAnchor>::new_memory()
+        let conn = Connection::open_in_memory()?;
+        let mut store = Store::<Keychain, ConfirmationHeightAnchor>::new(conn)
             .expect("create new memory db store");
-        // let mut store =
-        //     Store::<Keychain, ConfirmationHeightAnchor>::new(Path::new("test_agg.sqlite"))
-        //         .expect("create new file db store");
 
         test_changesets.iter().for_each(|changeset| {
             store.write_changes(changeset).expect("write changeset");
@@ -670,17 +650,16 @@ mod test {
         let agg_changeset = store.load_from_persistence().expect("aggregated changeset");
 
         assert_eq!(agg_changeset, Some(agg_test_changesets));
+        Ok(())
     }
 
     #[test]
-    fn insert_and_load_aggregate_changesets_with_blockid_anchor() {
+    fn insert_and_load_aggregate_changesets_with_blockid_anchor() -> anyhow::Result<()> {
         let (test_changesets, agg_test_changesets) =
             create_test_changesets(&|height, _time, hash| BlockId { height, hash });
 
-        let mut store =
-            Store::<Keychain, BlockId>::new_memory().expect("create new memory db store");
-        // let mut store = Store::<Keychain, BlockId>::new(Path::new("test_agg.sqlite"))
-        //     .expect("create new file db store");
+        let conn = Connection::open_in_memory()?;
+        let mut store = Store::<Keychain, BlockId>::new(conn).expect("create new memory db store");
 
         test_changesets.iter().for_each(|changeset| {
             store.write_changes(changeset).expect("write changeset");
@@ -689,6 +668,7 @@ mod test {
         let agg_changeset = store.load_from_persistence().expect("aggregated changeset");
 
         assert_eq!(agg_changeset, Some(agg_test_changesets));
+        Ok(())
     }
 
     fn create_test_changesets<A: Anchor + Copy>(
