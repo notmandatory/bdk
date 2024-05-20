@@ -11,6 +11,7 @@ pub mod wallet;
 
 use bdk_chain::bitcoin::Network;
 use bdk_chain::{indexed_tx_graph, keychain, local_chain, Anchor, Append};
+pub use rusqlite;
 use serde::{Deserialize, Serialize};
 
 /// Change set representing changes to [`local_chain::ChangeSet`] and [`indexed_tx_graph::ChangeSet`].
