@@ -11,12 +11,12 @@ use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
 use crate::schema::Schema;
-use crate::{ChangeSet, Error};
+use crate::{DbCommitment, Error};
 use bdk_chain::{
     indexed_tx_graph, keychain, local_chain, tx_graph, Anchor, Append, DescriptorExt, DescriptorId,
 };
 
-/// Persists [`ChangeSet`] data in to a relational schema based SQLite database file.
+/// Persists data in to a relational schema based SQLite database file.
 ///
 /// The changesets loaded or stored represent changes to keychain and blockchain data.
 #[derive(Debug)]
@@ -504,7 +504,7 @@ where
 {
     fn db_transaction(&mut self) -> Result<rusqlite::Transaction, Error>;
 
-    fn write(&mut self, changeset: &ChangeSet<K, A>) -> Result<(), Error> {
+    fn write(&mut self, changeset: &DbCommitment<K, A>) -> Result<(), Error> {
         // no need to write anything if changeset is empty
         if changeset.is_empty() {
             return Ok(());
@@ -529,7 +529,7 @@ where
         db_transaction.commit().map_err(Error::Sqlite)
     }
 
-    fn read(&mut self) -> Result<Option<ChangeSet<K, A>>, Error> {
+    fn read(&mut self) -> Result<Option<DbCommitment<K, A>>, Error> {
         let db_transaction = self.db_transaction()?;
 
         let network = Self::select_network(&db_transaction)?;
@@ -559,7 +559,7 @@ where
         if network.is_none() && chain.is_empty() && tx_graph.is_empty() {
             Ok(None)
         } else {
-            Ok(Some(ChangeSet {
+            Ok(Some(DbCommitment {
                 network,
                 chain,
                 tx_graph,
@@ -582,7 +582,7 @@ where
 mod test {
     use super::*;
     use crate::Append;
-    use crate::ChangeSet;
+    use crate::DbCommitment;
     use bdk_chain::bitcoin::consensus::encode::deserialize;
     use bdk_chain::bitcoin::constants::genesis_block;
     use bdk_chain::bitcoin::hashes::hex::FromHex;
@@ -671,7 +671,7 @@ mod test {
 
     fn create_test_changesets<A: Anchor + Copy>(
         anchor_fn: &dyn Fn(u32, u64, BlockHash) -> A,
-    ) -> (Vec<ChangeSet<Keychain, A>>, ChangeSet<Keychain, A>) {
+    ) -> (Vec<DbCommitment<Keychain, A>>, DbCommitment<Keychain, A>) {
         let secp = &secp256k1::Secp256k1::signing_only();
 
         let network_changeset = Some(Testnet);
@@ -745,7 +745,7 @@ mod test {
         // test changesets to write to db
         let mut changesets = Vec::new();
 
-        changesets.push(ChangeSet {
+        changesets.push(DbCommitment {
             network: network_changeset,
             chain: block_changeset,
             tx_graph: graph_changeset,
@@ -765,7 +765,7 @@ mod test {
                 indexer: keychain::ChangeSet::default(),
             };
 
-        changesets.push(ChangeSet {
+        changesets.push(DbCommitment {
             network: None,
             chain: local_chain::ChangeSet::default(),
             tx_graph: graph_changeset2,
@@ -785,7 +785,7 @@ mod test {
                 indexer: keychain::ChangeSet::default(),
             };
 
-        changesets.push(ChangeSet {
+        changesets.push(DbCommitment {
             network: None,
             chain: local_chain::ChangeSet::default(),
             tx_graph: graph_changeset3,
@@ -795,7 +795,7 @@ mod test {
         let agg_test_changesets =
             changesets
                 .iter()
-                .fold(ChangeSet::<Keychain, A>::default(), |mut i, cs| {
+                .fold(DbCommitment::<Keychain, A>::default(), |mut i, cs| {
                     i.append(cs.clone());
                     i
                 });

@@ -15,19 +15,20 @@ pub use rusqlite;
 use serde::{Deserialize, Serialize};
 pub use store::Store;
 
-/// Change set representing changes to [`local_chain::ChangeSet`] and [`indexed_tx_graph::ChangeSet`].
-///
-/// This structure is used to persist data with the SQLite based [`store::Store`] provided by this crate.
+/// Structure representing changes to be committed to the SQLite database.
 #[derive(Clone, Debug, PartialEq)]
-pub struct ChangeSet<K, A> {
+pub struct DbCommitment<K, A> {
+    /// Used to save [`Network`] type of the wallet.
     pub network: Option<Network>,
+    /// Changes to [`local_chain::LocalChain`].
     pub chain: local_chain::ChangeSet,
+    /// Changes to [`indexed_tx_graph::IndexedTxGraph`].
     pub tx_graph: indexed_tx_graph::ChangeSet<A, keychain::ChangeSet<K>>,
 }
 
-impl<K: Ord + for<'de> Deserialize<'de> + Serialize, A: Anchor> Default for ChangeSet<K, A> {
+impl<K: Ord + for<'de> Deserialize<'de> + Serialize, A: Anchor> Default for DbCommitment<K, A> {
     fn default() -> Self {
-        ChangeSet {
+        DbCommitment {
             network: None,
             chain: Default::default(),
             tx_graph: indexed_tx_graph::ChangeSet::default(),
@@ -35,7 +36,7 @@ impl<K: Ord + for<'de> Deserialize<'de> + Serialize, A: Anchor> Default for Chan
     }
 }
 
-impl<K, A> Append for ChangeSet<K, A>
+impl<K, A> Append for DbCommitment<K, A>
 where
     K: Ord + for<'de> Deserialize<'de> + Serialize,
     A: Anchor,

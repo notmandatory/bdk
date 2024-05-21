@@ -1,5 +1,5 @@
 use crate::store::{ReadWrite, Store};
-use crate::ChangeSet;
+use crate::DbCommitment;
 use anyhow::anyhow;
 use bdk_chain::ConfirmationTimeHeightAnchor;
 use bdk_persist::PersistBackend;
@@ -9,7 +9,7 @@ impl PersistBackend<bdk_wallet::wallet::ChangeSet>
     for Store<KeychainKind, ConfirmationTimeHeightAnchor>
 {
     fn write_changes(&mut self, changeset: &bdk_wallet::wallet::ChangeSet) -> anyhow::Result<()> {
-        let changeset = ChangeSet {
+        let changeset = DbCommitment {
             network: changeset.network,
             chain: changeset.chain.clone(),
             tx_graph: changeset.indexed_tx_graph.clone(),
