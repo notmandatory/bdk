@@ -50,6 +50,58 @@ impl<K: Ord, A: Anchor> Append for DbCommitment<K, A> {
     }
 }
 
+/// Tuple of combined [`bdk_chain`] change-sets.
+pub type ChangeSet<K, A> = (
+    Option<Network>,
+    local_chain::ChangeSet,
+    indexed_tx_graph::ChangeSet<A, keychain::ChangeSet<K>>,
+);
+
+impl<K, A> From<DbCommitment<K, A>> for ChangeSet<K, A> {
+    fn from(db_commit: DbCommitment<K, A>) -> Self {
+        (db_commit.network, db_commit.chain, db_commit.tx_graph)
+    }
+}
+
+impl<K, A> From<ChangeSet<K, A>> for DbCommitment<K, A> {
+    fn from(changeset: ChangeSet<K, A>) -> Self {
+        let (network, chain, tx_graph) = changeset;
+        Self {
+            network,
+            chain,
+            tx_graph,
+        }
+    }
+}
+
+/// Tuple of combined [`bdk_chain`] change-sets without [`Network`].
+pub type ChangeSetWithoutNetwork<K, A> = (
+    local_chain::ChangeSet,
+    indexed_tx_graph::ChangeSet<A, keychain::ChangeSet<K>>,
+);
+
+impl<K, A> From<DbCommitment<K, A>> for ChangeSetWithoutNetwork<K, A> {
+    fn from(db_commit: DbCommitment<K, A>) -> Self {
+        assert_eq!(
+            db_commit.network, None,
+            "changeset does not contain `Network`"
+        );
+        (db_commit.chain, db_commit.tx_graph)
+    }
+}
+
+impl<K, A> From<ChangeSetWithoutNetwork<K, A>> for DbCommitment<K, A> {
+    fn from(changeset: ChangeSetWithoutNetwork<K, A>) -> Self {
+        let (chain, tx_graph) = changeset;
+        let network = None;
+        Self {
+            network,
+            chain,
+            tx_graph,
+        }
+    }
+}
+
 #[cfg(feature = "wallet")]
 #[cfg_attr(docsrs, doc(cfg(feature = "wallet")))]
 impl From<bdk_wallet::wallet::ChangeSet>
