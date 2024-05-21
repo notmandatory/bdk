@@ -8,7 +8,6 @@ mod store;
 use bdk_chain::bitcoin::Network;
 use bdk_chain::{indexed_tx_graph, keychain, local_chain, Anchor, Append};
 pub use rusqlite;
-use serde::{Deserialize, Serialize};
 pub use store::Store;
 
 /// Structure representing changes to be committed to the SQLite database.
@@ -22,7 +21,7 @@ pub struct DbCommitment<K, A> {
     pub tx_graph: indexed_tx_graph::ChangeSet<A, keychain::ChangeSet<K>>,
 }
 
-impl<K: Ord + for<'de> Deserialize<'de> + Serialize, A: Anchor> Default for DbCommitment<K, A> {
+impl<K, A> Default for DbCommitment<K, A> {
     fn default() -> Self {
         DbCommitment {
             network: None,
@@ -32,11 +31,7 @@ impl<K: Ord + for<'de> Deserialize<'de> + Serialize, A: Anchor> Default for DbCo
     }
 }
 
-impl<K, A> Append for DbCommitment<K, A>
-where
-    K: Ord + for<'de> Deserialize<'de> + Serialize,
-    A: Anchor,
-{
+impl<K: Ord, A: Anchor> Append for DbCommitment<K, A> {
     fn append(&mut self, mut other: Self) {
         match (self.network, other.network) {
             // if current network is Some it can never be changed
