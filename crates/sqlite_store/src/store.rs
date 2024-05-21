@@ -6,7 +6,7 @@ use bdk_chain::miniscript::descriptor::{Descriptor, DescriptorPublicKey};
 use rusqlite::{named_params, Connection};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
-use std::marker::PhantomData;
+use std::fmt::Debug;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
@@ -19,26 +19,55 @@ use bdk_chain::{
 /// Persists data in to a relational schema based SQLite database file.
 ///
 /// The changesets loaded or stored represent changes to keychain and blockchain data.
-#[derive(Debug)]
-pub struct Store<K, A> {
+pub struct Store<K, A, C = DbCommitment<K, A>> {
     // A rusqlite connection to the SQLite database. Uses a Mutex for thread safety.
     conn: Mutex<Connection>,
-    keychain_marker: PhantomData<K>,
-    anchor_marker: PhantomData<A>,
+    pub(crate) transform: Box<dyn Fn(C) -> DbCommitment<K, A> + Send + Sync>,
+    pub(crate) transform_back: Box<dyn Fn(DbCommitment<K, A>) -> C + Send + Sync>,
 }
 
-impl<K, A> Store<K, A>
+impl<K, A, C> Debug for Store<K, A, C> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Debug::fmt(&self.conn, f)
+    }
+}
+
+impl<K, A, C> Store<K, A, C>
 where
     K: Ord + for<'de> Deserialize<'de> + Serialize + Send,
     A: Anchor + for<'de> Deserialize<'de> + Serialize + Send,
 {
     /// Creates a new store from a [`Connection`].
-    pub fn new(mut conn: Connection) -> Result<Self, rusqlite::Error> {
+    ///
+    /// This method is only avaliable if the changeset `C` can transform [`Into`] and [`From`] a
+    /// [`DbCommitment`].
+    pub fn new(conn: Connection) -> Result<Self, rusqlite::Error>
+    where
+        C: From<DbCommitment<K, A>> + Into<DbCommitment<K, A>>,
+    {
+        Self::new_with_transform(conn, |changeset| changeset.into(), |commit| commit.into())
+    }
+
+    /// Creates a new store from a [`Connection`] with provided transform methods.
+    ///
+    /// If the changeset `C` can transform [`Into`] and [`From`] a [`DbCommitment`], [`new`] can be
+    /// used instead.
+    ///
+    /// [`new`]: Self::new
+    pub fn new_with_transform<T, B>(
+        mut conn: Connection,
+        transform: T,
+        transform_back: B,
+    ) -> Result<Self, rusqlite::Error>
+    where
+        T: Fn(C) -> DbCommitment<K, A> + Send + Sync + 'static,
+        B: Fn(DbCommitment<K, A>) -> C + Send + Sync + 'static,
+    {
         Self::migrate(&mut conn)?;
         Ok(Self {
             conn: Mutex::new(conn),
-            keychain_marker: Default::default(),
-            anchor_marker: Default::default(),
+            transform: Box::new(transform),
+            transform_back: Box::new(transform_back),
         })
     }
 
@@ -48,7 +77,25 @@ where
     }
 }
 
-impl<K, A> Schema for Store<K, A>
+impl<K, A, C> bdk_persist::PersistBackend<C> for Store<K, A, C>
+where
+    K: Ord + for<'de> Deserialize<'de> + Serialize + Send,
+    A: Anchor + for<'de> Deserialize<'de> + Serialize + Send,
+    C: Clone,
+{
+    fn write_changes(&mut self, changeset: &C) -> anyhow::Result<()> {
+        self.write((*self.transform)(changeset.clone()))
+            .map_err(|e| anyhow::anyhow!(e).context("unable to write changes to sqlite database"))
+    }
+
+    fn load_from_persistence(&mut self) -> anyhow::Result<Option<C>> {
+        self.read()
+            .map(|v| v.map(|db_commit| (*self.transform_back)(db_commit)))
+            .map_err(|e| anyhow::anyhow!(e).context("unable to read changes from sqlite database"))
+    }
+}
+
+impl<K, A, C> Schema for Store<K, A, C>
 where
     K: Ord + for<'de> Deserialize<'de> + Serialize + Send,
     A: Anchor + Send,
@@ -112,7 +159,7 @@ pub(crate) trait NetworkStore {
     }
 }
 
-impl<K, A> NetworkStore for Store<K, A>
+impl<K, A, C> NetworkStore for Store<K, A, C>
 where
     K: Send,
     A: Send,
@@ -178,7 +225,7 @@ pub(crate) trait BlockStore {
     }
 }
 
-impl<K, A> BlockStore for Store<K, A>
+impl<K, A, C> BlockStore for Store<K, A, C>
 where
     K: Send,
     A: Send,
@@ -284,7 +331,7 @@ where
     }
 }
 
-impl<K, A> KeychainStore<K, A> for Store<K, A>
+impl<K, A, C> KeychainStore<K, A> for Store<K, A, C>
 where
     K: Ord + for<'de> Deserialize<'de> + Serialize + Send,
     A: Anchor + Send,
@@ -428,7 +475,7 @@ pub(crate) trait TxStore<K: Send, A: Send> {
     }
 }
 
-impl<K, A> TxStore<K, A> for Store<K, A>
+impl<K, A, C> TxStore<K, A> for Store<K, A, C>
 where
     K: Ord + for<'de> Deserialize<'de> + Serialize + Send,
     A: Anchor + Send,
@@ -488,7 +535,7 @@ where
     }
 }
 
-impl<K, A> AnchorStore<K, A> for Store<K, A>
+impl<K, A, C> AnchorStore<K, A> for Store<K, A, C>
 where
     K: Ord + for<'de> Deserialize<'de> + Serialize + Send,
     A: Anchor + for<'de> Deserialize<'de> + Serialize + Send,
@@ -504,7 +551,7 @@ where
 {
     fn db_transaction(&mut self) -> Result<rusqlite::Transaction, Error>;
 
-    fn write(&mut self, changeset: &DbCommitment<K, A>) -> Result<(), Error> {
+    fn write(&mut self, changeset: DbCommitment<K, A>) -> Result<(), Error> {
         // no need to write anything if changeset is empty
         if changeset.is_empty() {
             return Ok(());
@@ -568,7 +615,7 @@ where
     }
 }
 
-impl<K, A> ReadWrite<K, A> for Store<K, A>
+impl<K, A, C> ReadWrite<K, A> for Store<K, A, C>
 where
     K: Ord + for<'de> Deserialize<'de> + Serialize + Send,
     A: Anchor + for<'de> Deserialize<'de> + Serialize + Send,

@@ -2,12 +2,8 @@
 // only enables the `doc_cfg` feature when the `docsrs` configuration attribute is defined
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-pub mod persist;
 mod schema;
 mod store;
-#[cfg(feature = "wallet")]
-#[cfg_attr(docsrs, doc(cfg(feature = "wallet")))]
-pub mod wallet;
 
 use bdk_chain::bitcoin::Network;
 use bdk_chain::{indexed_tx_graph, keychain, local_chain, Anchor, Append};
@@ -56,6 +52,36 @@ where
 
     fn is_empty(&self) -> bool {
         self.chain.is_empty() && self.tx_graph.is_empty()
+    }
+}
+
+#[cfg(feature = "wallet")]
+#[cfg_attr(docsrs, doc(cfg(feature = "wallet")))]
+impl From<bdk_wallet::wallet::ChangeSet>
+    for DbCommitment<bdk_wallet::KeychainKind, bdk_chain::ConfirmationTimeHeightAnchor>
+{
+    fn from(changeset: bdk_wallet::wallet::ChangeSet) -> Self {
+        Self {
+            network: changeset.network,
+            chain: changeset.chain,
+            tx_graph: changeset.indexed_tx_graph,
+        }
+    }
+}
+
+#[cfg(feature = "wallet")]
+#[cfg_attr(docsrs, doc(cfg(feature = "wallet")))]
+impl From<DbCommitment<bdk_wallet::KeychainKind, bdk_chain::ConfirmationTimeHeightAnchor>>
+    for bdk_wallet::wallet::ChangeSet
+{
+    fn from(
+        db_commit: DbCommitment<bdk_wallet::KeychainKind, bdk_chain::ConfirmationTimeHeightAnchor>,
+    ) -> Self {
+        Self {
+            chain: db_commit.chain,
+            indexed_tx_graph: db_commit.tx_graph,
+            network: db_commit.network,
+        }
     }
 }
 
