@@ -3,6 +3,7 @@ use bdk_chain::bitcoin::hashes::Hash;
 use bdk_chain::bitcoin::{Amount, Network, OutPoint, ScriptBuf, Transaction, TxOut};
 use bdk_chain::bitcoin::{BlockHash, Txid};
 use bdk_chain::miniscript::descriptor::{Descriptor, DescriptorPublicKey};
+use bdk_persist::CombinedChangeSet;
 use rusqlite::{named_params, Connection};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -11,7 +12,7 @@ use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
 use crate::schema::Schema;
-use crate::{DbCommitment, Error};
+use crate::Error;
 use bdk_chain::{
     indexed_tx_graph, keychain, local_chain, tx_graph, Anchor, Append, DescriptorExt, DescriptorId,
 };
@@ -19,11 +20,11 @@ use bdk_chain::{
 /// Persists data in to a relational schema based SQLite database file.
 ///
 /// The changesets loaded or stored represent changes to keychain and blockchain data.
-pub struct Store<K, A, C = DbCommitment<K, A>> {
+pub struct Store<K, A, C = CombinedChangeSet<K, A>> {
     // A rusqlite connection to the SQLite database. Uses a Mutex for thread safety.
     conn: Mutex<Connection>,
-    pub(crate) transform: Box<dyn Fn(C) -> DbCommitment<K, A> + Send + Sync>,
-    pub(crate) transform_back: Box<dyn Fn(DbCommitment<K, A>) -> C + Send + Sync>,
+    pub(crate) transform: Box<dyn Fn(C) -> CombinedChangeSet<K, A> + Send + Sync>,
+    pub(crate) transform_back: Box<dyn Fn(CombinedChangeSet<K, A>) -> C + Send + Sync>,
 }
 
 impl<K, A, C> Debug for Store<K, A, C> {
@@ -43,7 +44,7 @@ where
     /// [`DbCommitment`].
     pub fn new(conn: Connection) -> Result<Self, rusqlite::Error>
     where
-        C: From<DbCommitment<K, A>> + Into<DbCommitment<K, A>>,
+        C: From<CombinedChangeSet<K, A>> + Into<CombinedChangeSet<K, A>>,
     {
         Self::new_with_transform(conn, |changeset| changeset.into(), |commit| commit.into())
     }
@@ -60,8 +61,8 @@ where
         transform_back: B,
     ) -> Result<Self, rusqlite::Error>
     where
-        T: Fn(C) -> DbCommitment<K, A> + Send + Sync + 'static,
-        B: Fn(DbCommitment<K, A>) -> C + Send + Sync + 'static,
+        T: Fn(C) -> CombinedChangeSet<K, A> + Send + Sync + 'static,
+        B: Fn(CombinedChangeSet<K, A>) -> C + Send + Sync + 'static,
     {
         Self::migrate(&mut conn)?;
         Ok(Self {
@@ -551,7 +552,7 @@ where
 {
     fn db_transaction(&mut self) -> Result<rusqlite::Transaction, Error>;
 
-    fn write(&mut self, changeset: DbCommitment<K, A>) -> Result<(), Error> {
+    fn write(&mut self, changeset: CombinedChangeSet<K, A>) -> Result<(), Error> {
         // no need to write anything if changeset is empty
         if changeset.is_empty() {
             return Ok(());
@@ -566,7 +567,7 @@ where
         let chain_changeset = &changeset.chain;
         Self::insert_or_delete_blocks(&db_transaction, chain_changeset)?;
 
-        let tx_graph_changeset = &changeset.tx_graph;
+        let tx_graph_changeset = &changeset.indexed_tx_graph;
         Self::insert_keychains(&db_transaction, tx_graph_changeset)?;
         Self::update_last_revealed(&db_transaction, tx_graph_changeset)?;
         Self::insert_txs(&db_transaction, tx_graph_changeset)?;
@@ -576,7 +577,7 @@ where
         db_transaction.commit().map_err(Error::Sqlite)
     }
 
-    fn read(&mut self) -> Result<Option<DbCommitment<K, A>>, Error> {
+    fn read(&mut self) -> Result<Option<CombinedChangeSet<K, A>>, Error> {
         let db_transaction = self.db_transaction()?;
 
         let network = Self::select_network(&db_transaction)?;
@@ -600,16 +601,16 @@ where
             last_revealed,
         };
 
-        let tx_graph: indexed_tx_graph::ChangeSet<A, keychain::ChangeSet<K>> =
+        let indexed_tx_graph: indexed_tx_graph::ChangeSet<A, keychain::ChangeSet<K>> =
             indexed_tx_graph::ChangeSet { graph, indexer };
 
-        if network.is_none() && chain.is_empty() && tx_graph.is_empty() {
+        if network.is_none() && chain.is_empty() && indexed_tx_graph.is_empty() {
             Ok(None)
         } else {
-            Ok(Some(DbCommitment {
+            Ok(Some(CombinedChangeSet {
                 network,
                 chain,
-                tx_graph,
+                indexed_tx_graph,
             }))
         }
     }
@@ -628,8 +629,6 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::Append;
-    use crate::DbCommitment;
     use bdk_chain::bitcoin::consensus::encode::deserialize;
     use bdk_chain::bitcoin::constants::genesis_block;
     use bdk_chain::bitcoin::hashes::hex::FromHex;
@@ -637,6 +636,7 @@ mod test {
     use bdk_chain::bitcoin::Network::Testnet;
     use bdk_chain::bitcoin::{secp256k1, BlockHash, OutPoint};
     use bdk_chain::miniscript::Descriptor;
+    use bdk_chain::Append;
     use bdk_chain::{
         indexed_tx_graph, keychain, tx_graph, BlockId, ConfirmationHeightAnchor,
         ConfirmationTimeHeightAnchor, DescriptorExt,
@@ -718,7 +718,10 @@ mod test {
 
     fn create_test_changesets<A: Anchor + Copy>(
         anchor_fn: &dyn Fn(u32, u64, BlockHash) -> A,
-    ) -> (Vec<DbCommitment<Keychain, A>>, DbCommitment<Keychain, A>) {
+    ) -> (
+        Vec<CombinedChangeSet<Keychain, A>>,
+        CombinedChangeSet<Keychain, A>,
+    ) {
         let secp = &secp256k1::Secp256k1::signing_only();
 
         let network_changeset = Some(Testnet);
@@ -792,10 +795,10 @@ mod test {
         // test changesets to write to db
         let mut changesets = Vec::new();
 
-        changesets.push(DbCommitment {
+        changesets.push(CombinedChangeSet {
             network: network_changeset,
             chain: block_changeset,
-            tx_graph: graph_changeset,
+            indexed_tx_graph: graph_changeset,
         });
 
         // create changeset that sets the whole tx2 and updates it's lastseen where before there was only the txid and last_seen
@@ -812,10 +815,10 @@ mod test {
                 indexer: keychain::ChangeSet::default(),
             };
 
-        changesets.push(DbCommitment {
+        changesets.push(CombinedChangeSet {
             network: None,
             chain: local_chain::ChangeSet::default(),
-            tx_graph: graph_changeset2,
+            indexed_tx_graph: graph_changeset2,
         });
 
         // create changeset that adds a new anchor2 for tx0 and tx1
@@ -832,17 +835,17 @@ mod test {
                 indexer: keychain::ChangeSet::default(),
             };
 
-        changesets.push(DbCommitment {
+        changesets.push(CombinedChangeSet {
             network: None,
             chain: local_chain::ChangeSet::default(),
-            tx_graph: graph_changeset3,
+            indexed_tx_graph: graph_changeset3,
         });
 
         // aggregated test changesets
         let agg_test_changesets =
             changesets
                 .iter()
-                .fold(DbCommitment::<Keychain, A>::default(), |mut i, cs| {
+                .fold(CombinedChangeSet::<Keychain, A>::default(), |mut i, cs| {
                     i.append(cs.clone());
                     i
                 });

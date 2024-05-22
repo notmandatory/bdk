@@ -8,6 +8,6 @@ edition = "2021"
 [dependencies]
 bdk_wallet = { path = "../../crates/wallet" }
 bdk_esplora = { path = "../../crates/esplora", features = ["async-https"] }
-bdk_sqlite_store = { path = "../../crates/sqlite_store", features = ["wallet"] }
+bdk_sqlite_store = { path = "../../crates/sqlite_store" }
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros"] }
 anyhow = "1"
