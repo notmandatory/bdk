@@ -1,53 +1,59 @@
 use crate::{bincode_options, EntryIter, FileError, IterError};
-use anyhow::anyhow;
 use bdk_chain::Append;
-use bdk_persist::PersistBackend;
+use bdk_persist::{Persist, Stage};
 use bincode::Options;
 use std::{
     fmt::{self, Debug},
     fs::{File, OpenOptions},
     io::{self, Read, Seek, Write},
-    marker::PhantomData,
+    mem,
     path::Path,
 };
 
 /// Persists an append-only list of changesets (`C`) to a single file.
 #[derive(Debug)]
-pub struct Store<C>
-where
-    C: Sync + Send,
-{
+pub struct Store<C> {
     magic_len: usize,
     db_file: File,
-    marker: PhantomData<C>,
+    staged: C,
 }
 
-impl<C> PersistBackend<C> for Store<C>
+impl<C> Persist<C> for Store<C>
 where
-    C: Append
-        + serde::Serialize
-        + serde::de::DeserializeOwned
-        + core::marker::Send
-        + core::marker::Sync,
+    C: Append + serde::Serialize + serde::de::DeserializeOwned + Default,
 {
-    fn write_changes(&mut self, changeset: &C) -> anyhow::Result<()> {
+    type WriteError = io::Error;
+    type LoadError = IterError;
+
+    fn write_changes(&mut self, changeset: &C) -> Result<(), Self::WriteError> {
         self.append_changeset(changeset)
-            .map_err(|e| anyhow!(e).context("failed to write changes to persistence backend"))
     }
 
-    fn load_from_persistence(&mut self) -> anyhow::Result<Option<C>> {
-        self.aggregate_changesets()
-            .map_err(|e| anyhow!(e.iter_error).context("error loading from persistence backend"))
+    fn load_changes(&mut self) -> Result<Option<C>, Self::LoadError> {
+        self.aggregate_changesets().map_err(|e| e.iter_error)
+    }
+}
+
+impl<C> Stage<C> for Store<C>
+where
+    C: Append + serde::Serialize + serde::de::DeserializeOwned + Default,
+{
+    fn stage(&mut self, changeset: C) {
+        self.staged.append(changeset)
+    }
+
+    fn staged(&self) -> &C {
+        &self.staged
+    }
+
+    fn take_staged(&mut self) -> C {
+        mem::take(&mut self.staged)
     }
 }
 
 impl<C> Store<C>
 where
-    C: Append
-        + serde::Serialize
-        + serde::de::DeserializeOwned
-        + core::marker::Send
-        + core::marker::Sync,
+    C: Append + serde::Serialize + serde::de::DeserializeOwned + Default,
 {
     /// Create a new [`Store`] file in write-only mode; error if the file exists.
     ///
@@ -77,7 +83,7 @@ where
         Ok(Self {
             magic_len: magic.len(),
             db_file: f,
-            marker: Default::default(),
+            staged: Default::default(),
         })
     }
 
@@ -109,7 +115,7 @@ where
         Ok(Self {
             magic_len: magic.len(),
             db_file: f,
-            marker: Default::default(),
+            staged: Default::default(),
         })
     }
 
@@ -225,6 +231,7 @@ impl<C: fmt::Debug> std::error::Error for AggregateChangesetsError<C> {}
 mod test {
     use super::*;
 
+    use bdk_persist::Persist;
     use bincode::DefaultOptions;
     use std::{
         collections::BTreeSet,
@@ -461,4 +468,18 @@ mod test {
             assert_eq!(aggregation, exp_aggregation);
         }
     }
+
+    // #[test]
+    // fn test_persist_stage_commit() {
+    //     let temp_dir = tempfile::tempdir().unwrap();
+    //     let file_path = temp_dir.path().join("db_file");
+    //     let mut backend = Store::<TestChangeSet>::open(&TEST_MAGIC_BYTES, &file_path).unwrap();
+    //
+    //     backend.stage(["ONE".to_string()].into());
+    //     backend.stage(TestChangeSet::default());
+    //     backend.stage(["TWO".to_string()].into());
+    //     let expected: TestChangeSet = ["ONE".to_string(),"TWO".to_string()].into();
+    //     let result = backend.commit();
+    //     //assert!(match!(result, Ok(Some(c)) if c == expected));
+    // }
 }

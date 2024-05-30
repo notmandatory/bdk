@@ -86,13 +86,15 @@ fn main() -> anyhow::Result<()> {
     );
 
     let start_load_wallet = Instant::now();
+    let db = &mut Store::<bdk_wallet::wallet::ChangeSet>::open_or_create_new(
+        DB_MAGIC.as_bytes(),
+        args.db_path,
+    )?;
+    let loaded_changeset = db.aggregate_changesets()?;
     let mut wallet = Wallet::new_or_load(
         &args.descriptor,
         args.change_descriptor.as_ref(),
-        Store::<bdk_wallet::wallet::ChangeSet>::open_or_create_new(
-            DB_MAGIC.as_bytes(),
-            args.db_path,
-        )?,
+        loaded_changeset,
         args.network,
     )?;
     println!(
@@ -143,7 +145,8 @@ fn main() -> anyhow::Result<()> {
                 let connected_to = block_emission.connected_to();
                 let start_apply_block = Instant::now();
                 wallet.apply_block_connected_to(&block_emission.block, height, connected_to)?;
-                wallet.commit()?;
+                let changeset = wallet.take_staged();
+                db.append_changeset(&changeset)?;
                 let elapsed = start_apply_block.elapsed().as_secs_f32();
                 println!(
                     "Applied block {} at height {} in {}s",
@@ -153,7 +156,8 @@ fn main() -> anyhow::Result<()> {
             Emission::Mempool(mempool_emission) => {
                 let start_apply_mempool = Instant::now();
                 wallet.apply_unconfirmed_txs(mempool_emission.iter().map(|(tx, time)| (tx, *time)));
-                wallet.commit()?;
+                let changeset = wallet.take_staged();
+                db.append_changeset(&changeset)?;
                 println!(
                     "Applied unconfirmed transactions in {}s",
                     start_apply_mempool.elapsed().as_secs_f32()

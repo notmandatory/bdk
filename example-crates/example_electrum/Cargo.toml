@@ -7,5 +7,6 @@ edition = "2021"
 
 [dependencies]
 bdk_chain = { path = "../../crates/chain", features = ["serde"] }
+bdk_persist = { path = "../../crates/persist" }
 bdk_electrum = { path = "../../crates/electrum" }
 example_cli = { path = "../example_cli" }

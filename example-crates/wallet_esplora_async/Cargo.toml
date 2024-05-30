@@ -9,5 +9,6 @@ edition = "2021"
 bdk_wallet = { path = "../../crates/wallet" }
 bdk_esplora = { path = "../../crates/esplora", features = ["async-https"] }
 bdk_sqlite = { path = "../../crates/sqlite" }
+bdk_persist = { path = "../../crates/persist" }
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros"] }
 anyhow = "1"

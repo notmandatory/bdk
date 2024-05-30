@@ -1,8 +1,11 @@
+extern crate core;
+
 pub use anyhow;
 use anyhow::Context;
 use bdk_coin_select::{coin_select_bnb, CoinSelector, CoinSelectorOpt, WeightedValue};
 use bdk_file_store::Store;
 use serde::{de::DeserializeOwned, Serialize};
+use std::fmt::Debug;
 use std::{cmp::Reverse, collections::BTreeMap, path::PathBuf, sync::Mutex, time::Duration};
 
 use bdk_chain::{
@@ -22,7 +25,7 @@ use bdk_chain::{
     Anchor, Append, ChainOracle, DescriptorExt, FullTxOut,
 };
 pub use bdk_file_store;
-use bdk_persist::{Persist, PersistBackend};
+use bdk_persist::{Persist, Stage};
 pub use clap;
 
 use clap::{Parser, Subcommand};
@@ -447,9 +450,15 @@ pub fn planned_utxos<A: Anchor, O: ChainOracle, K: Clone + bdk_tmp_plan::CanDeri
         .collect()
 }
 
-pub fn handle_commands<CS: clap::Subcommand, S: clap::Args, A: Anchor, O: ChainOracle, C>(
+pub fn handle_commands<
+    CS: clap::Subcommand,
+    S: clap::Args,
+    A: Anchor,
+    O: ChainOracle,
+    C: Default + Append + Serialize + DeserializeOwned + From<KeychainChangeSet<A>> + Send + Sync + Debug,
+>(
     graph: &Mutex<KeychainTxGraph<A>>,
-    db: &Mutex<Persist<C>>,
+    db: &Mutex<Store<C>>,
     chain: &Mutex<O>,
     keymap: &BTreeMap<DescriptorPublicKey, DescriptorSecretKey>,
     network: Network,
@@ -458,7 +467,6 @@ pub fn handle_commands<CS: clap::Subcommand, S: clap::Args, A: Anchor, O: ChainO
 ) -> anyhow::Result<()>
 where
     O::Error: std::error::Error + Send + Sync + 'static,
-    C: Default + Append + DeserializeOwned + Serialize + From<KeychainChangeSet<A>>,
 {
     match cmd {
         Commands::ChainSpecific(_) => unreachable!("example code should handle this!"),
@@ -676,8 +684,8 @@ pub struct Init<CS: clap::Subcommand, S: clap::Args, C> {
     pub keymap: KeyMap,
     /// Keychain-txout index.
     pub index: KeychainTxOutIndex<Keychain>,
-    /// Persistence backend.
-    pub db: Mutex<Persist<C>>,
+    /// Stage and Persist backend.
+    pub db: Mutex<Store<C>>,
     /// Initial changeset.
     pub init_changeset: C,
 }
@@ -689,13 +697,7 @@ pub fn init<CS: clap::Subcommand, S: clap::Args, C>(
     db_default_path: &str,
 ) -> anyhow::Result<Init<CS, S, C>>
 where
-    C: Default
-        + Append
-        + Serialize
-        + DeserializeOwned
-        + core::marker::Send
-        + core::marker::Sync
-        + 'static,
+    C: Append + serde::Serialize + serde::de::DeserializeOwned + Default,
 {
     if std::env::var("BDK_DB_PATH").is_err() {
         std::env::set_var("BDK_DB_PATH", db_default_path);
@@ -721,19 +723,22 @@ where
         let _ = index.insert_descriptor(Keychain::Internal, internal_descriptor);
     }
 
-    let mut db_backend = match Store::<C>::open_or_create_new(db_magic, &args.db_path) {
-        Ok(db_backend) => db_backend,
-        // we cannot return `err` directly as it has lifetime `'m`
-        Err(err) => return Err(anyhow::anyhow!("failed to init db backend: {:?}", err)),
-    };
+    // let mut db_backend: B = match Store::<C>::open_or_create_new(db_magic, &args.db_path) {
+    //     Ok(db_backend) => db_backend,
+    //     // we cannot return `err` directly as it has lifetime `'m`
+    //     Err(err) => return Err(anyhow::anyhow!("failed to init db backend: {:?}", err)),
+    // };
 
-    let init_changeset = db_backend.load_from_persistence()?.unwrap_or_default();
+    let mut db_backend = Store::<C>::open_or_create_new(db_magic, &args.db_path)
+        .map_err(|err| anyhow::anyhow!("failed to init db backend: {:?}", err))?;
+
+    let init_changeset = db_backend.load_changes()?.unwrap_or_default();
 
     Ok(Init {
         args,
         keymap,
         index,
-        db: Mutex::new(Persist::new(db_backend)),
+        db: Mutex::new(db_backend),
         init_changeset,
     })
 }

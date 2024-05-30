@@ -18,19 +18,24 @@ use bdk_wallet::{KeychainKind, SignOptions};
 
 fn main() -> Result<(), anyhow::Error> {
     let db_path = std::env::temp_dir().join("bdk-electrum-example");
-    let db =
-        Store::<bdk_wallet::wallet::ChangeSet>::open_or_create_new(DB_MAGIC.as_bytes(), db_path)?;
+    let db = &mut Store::<bdk_wallet::wallet::ChangeSet>::open_or_create_new(
+        DB_MAGIC.as_bytes(),
+        db_path,
+    )?;
+    let changeset = db.aggregate_changesets().expect("load changeset");
     let external_descriptor = "wpkh(tprv8ZgxMBicQKsPdy6LMhUtFHAgpocR8GC6QmwMSFpZs7h6Eziw3SpThFfczTDh5rW2krkqffa11UpX3XkeTTB2FvzZKWXqPY54Y6Rq4AQ5R8L/84'/1'/0'/0/*)";
     let internal_descriptor = "wpkh(tprv8ZgxMBicQKsPdy6LMhUtFHAgpocR8GC6QmwMSFpZs7h6Eziw3SpThFfczTDh5rW2krkqffa11UpX3XkeTTB2FvzZKWXqPY54Y6Rq4AQ5R8L/84'/1'/0'/1/*)";
 
     let mut wallet = Wallet::new_or_load(
         external_descriptor,
         Some(internal_descriptor),
-        db,
+        changeset,
         Network::Testnet,
     )?;
 
-    let address = wallet.next_unused_address(KeychainKind::External)?;
+    let address = wallet.next_unused_address(KeychainKind::External);
+    let changeset = wallet.take_staged();
+    db.append_changeset(&changeset)?;
     println!("Generated Address: {}", address);
 
     let balance = wallet.get_balance();
@@ -63,7 +68,6 @@ fn main() -> Result<(), anyhow::Error> {
     println!();
 
     wallet.apply_update(update)?;
-    wallet.commit()?;
 
     let balance = wallet.get_balance();
     println!("Wallet balance after syncing: {} sats", balance.total());

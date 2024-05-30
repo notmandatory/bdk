@@ -46,11 +46,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Compiled into following Descriptor: \n{}", descriptor);
 
     // Create a new wallet from this descriptor
-    let mut wallet = Wallet::new_no_persist(&format!("{}", descriptor), None, Network::Regtest)?;
+    let mut wallet = Wallet::new(&format!("{}", descriptor), None, Network::Regtest)?;
 
     println!(
         "First derived address from the descriptor: \n{}",
-        wallet.next_unused_address(KeychainKind::External)?,
+        wallet.next_unused_address(KeychainKind::External),
     );
 
     // BDK also has it's own `Policy` structure to represent the spending condition in a more

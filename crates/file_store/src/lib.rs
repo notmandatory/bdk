@@ -1,4 +1,6 @@
 #![doc = include_str!("../README.md")]
+extern crate core;
+
 mod entry_iter;
 mod store;
 use std::io;

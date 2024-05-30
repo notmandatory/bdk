@@ -228,7 +228,7 @@ mod test {
         change_descriptor: Option<&str>,
         network: Network,
     ) -> Wallet {
-        let mut wallet = Wallet::new_no_persist(descriptor, change_descriptor, network).unwrap();
+        let mut wallet = Wallet::new(descriptor, change_descriptor, network).unwrap();
         let transaction = Transaction {
             input: vec![],
             output: vec![],

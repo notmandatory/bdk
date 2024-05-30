@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 bdk_chain = { path = "../../crates/chain", features = ["serde"] }
+bdk_persist = { path = "../../crates/persist" }
 bdk_bitcoind_rpc = { path = "../../crates/bitcoind_rpc" }
 example_cli = { path = "../example_cli" }
 ctrlc = { version = "^2" }

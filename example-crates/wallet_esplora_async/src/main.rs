@@ -1,6 +1,7 @@
 use std::{collections::BTreeSet, io::Write, str::FromStr};
 
 use bdk_esplora::{esplora_client, EsploraAsyncExt};
+use bdk_persist::Persist;
 use bdk_wallet::{
     bitcoin::{Address, Amount, Network, Script},
     KeychainKind, SignOptions, Wallet,
@@ -16,19 +17,22 @@ const PARALLEL_REQUESTS: usize = 5;
 async fn main() -> Result<(), anyhow::Error> {
     let db_path = "bdk-esplora-async-example.sqlite";
     let conn = Connection::open(db_path)?;
-    let db = Store::new(conn)?;
+    let db = &mut Store::new(conn)?;
+    let changeset = db.load_changes()?;
     let external_descriptor = "wpkh(tprv8ZgxMBicQKsPdy6LMhUtFHAgpocR8GC6QmwMSFpZs7h6Eziw3SpThFfczTDh5rW2krkqffa11UpX3XkeTTB2FvzZKWXqPY54Y6Rq4AQ5R8L/84'/1'/0'/0/*)";
     let internal_descriptor = "wpkh(tprv8ZgxMBicQKsPdy6LMhUtFHAgpocR8GC6QmwMSFpZs7h6Eziw3SpThFfczTDh5rW2krkqffa11UpX3XkeTTB2FvzZKWXqPY54Y6Rq4AQ5R8L/84'/1'/0'/1/*)";
 
     let mut wallet = Wallet::new_or_load(
         external_descriptor,
         Some(internal_descriptor),
-        db,
+        changeset,
         Network::Signet,
     )?;
 
-    let address = wallet.next_unused_address(KeychainKind::External)?;
+    let address = wallet.next_unused_address(KeychainKind::External);
     println!("Generated Address: {}", address);
+    let changeset = wallet.take_staged();
+    db.write_changes(&changeset)?;
 
     let balance = wallet.get_balance();
     println!("Wallet balance before syncing: {} sats", balance.total());
@@ -75,7 +79,8 @@ async fn main() -> Result<(), anyhow::Error> {
     let _ = update.graph_update.update_last_seen_unconfirmed(now);
 
     wallet.apply_update(update)?;
-    wallet.commit()?;
+    let changeset = wallet.take_staged();
+    db.write_changes(&changeset)?;
     println!();
 
     let balance = wallet.get_balance();

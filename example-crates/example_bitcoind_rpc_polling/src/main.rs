@@ -7,6 +7,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+use bdk_persist::Stage;
+
 use bdk_bitcoind_rpc::{
     bitcoincore_rpc::{Auth, Client, RpcApi},
     Emitter,

@@ -3,6 +3,8 @@ use std::{
     sync::Mutex,
 };
 
+use bdk_persist::Stage;
+
 use bdk_chain::{
     bitcoin::{constants::genesis_block, Address, Network, Txid},
     collections::BTreeSet,
