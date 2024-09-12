@@ -75,7 +75,7 @@ pub mod error;
 
 pub use utils::IsDust;
 
-use coin_selection::{DefaultCoinSelectionAlgorithm, InsufficientFunds};
+use coin_selection::DefaultCoinSelectionAlgorithm;
 use signer::{SignOptions, SignerOrdering, SignersContainer, TransactionSigner};
 use tx_builder::{FeePolicy, TxBuilder, TxParams};
 use utils::{check_nsequence_rbf, After, Older, SecpCtx};
@@ -1534,10 +1534,12 @@ impl Wallet {
                     change_fee,
                 } = excess
                 {
-                    return Err(CreateTxError::CoinSelection(InsufficientFunds {
-                        needed: *dust_threshold,
-                        available: remaining_amount.saturating_sub(*change_fee),
-                    }));
+                    return Err(CreateTxError::CoinSelection(
+                        coin_selection::Error::InsufficientFunds {
+                            needed: *dust_threshold,
+                            available: remaining_amount.saturating_sub(*change_fee),
+                        },
+                    ));
                 }
             } else {
                 return Err(CreateTxError::NoRecipients);

@@ -44,7 +44,7 @@
 //!         target_amount: u64,
 //!         drain_script: &Script,
 //!         rand: &mut R,
-//!     ) -> Result<CoinSelectionResult, coin_selection::InsufficientFunds> {
+//!     ) -> Result<CoinSelectionResult, coin_selection::Error> {
 //!         let mut selected_amount = 0;
 //!         let mut additional_weight = Weight::ZERO;
 //!         let all_utxos_selected = required_utxos
@@ -65,7 +65,7 @@
 //!         let additional_fees = (fee_rate * additional_weight).to_sat();
 //!         let amount_needed_with_fees = additional_fees + target_amount;
 //!         if selected_amount < amount_needed_with_fees {
-//!             return Err(coin_selection::InsufficientFunds {
+//!             return Err(coin_selection::Error::InsufficientFunds {
 //!                 needed: amount_needed_with_fees,
 //!                 available: selected_amount,
 //!             });
@@ -113,38 +113,46 @@ use bitcoin::OutPoint;
 use bitcoin::TxIn;
 use bitcoin::{Script, Weight};
 
-use core::convert::TryInto;
-use core::fmt::{self, Formatter};
-use rand_core::RngCore;
-
 use super::utils::shuffle_slice;
+use core::convert::TryInto;
+use core::fmt::{self, Debug, Display, Formatter};
+use rand_core::RngCore;
 /// Default coin selection algorithm used by [`TxBuilder`](super::tx_builder::TxBuilder) if not
 /// overridden
 pub type DefaultCoinSelectionAlgorithm = BranchAndBoundCoinSelection<SingleRandomDraw>;
 
-/// Wallet's UTXO set is not enough to cover recipient's requested plus fee.
-///
-/// This is thrown by [`CoinSelectionAlgorithm`].
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct InsufficientFunds {
-    /// Sats needed for some transaction
-    pub needed: u64,
-    /// Sats available for spending
-    pub available: u64,
+/// Error thrown by [`CoinSelectionAlgorithm`].
+#[derive(Debug)]
+pub enum Error {
+    /// Wallet's UTXO set is not enough to cover recipient's requested plus fee.
+    InsufficientFunds {
+        /// Sats needed for some transaction
+        needed: u64,
+        /// Sats available for spending
+        available: u64,
+    },
+    /// Error specific to the [`CoinSelectionAlgorithm`] used.
+    Algorithm(alloc::boxed::Box<dyn AlgorithmError>),
 }
 
-impl fmt::Display for InsufficientFunds {
+/// Trait that must be implemented by [`CoinSelectionAlgorithm`] errors.
+pub trait AlgorithmError: Debug + Display + Send + Sync + 'static {}
+
+impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Insufficient funds: {} sat available of {} sat needed",
-            self.available, self.needed
-        )
+        match self {
+            Error::InsufficientFunds { needed, available } => write!(
+                f,
+                "Insufficient funds: {} sat available of {} sat needed",
+                available, needed
+            ),
+            Error::Algorithm(e) => write!(f, "{:?}", e),
+        }
     }
 }
 
 #[cfg(feature = "std")]
-impl std::error::Error for InsufficientFunds {}
+impl std::error::Error for Error {}
 
 #[derive(Debug)]
 /// Remaining amount after performing coin selection
@@ -202,7 +210,7 @@ impl CoinSelectionResult {
 /// selection algorithm when it creates transactions.
 ///
 /// For an example see [this module](crate::wallet::coin_selection)'s documentation.
-pub trait CoinSelectionAlgorithm: core::fmt::Debug {
+pub trait CoinSelectionAlgorithm: Debug {
     /// Perform the coin selection
     ///
     /// - `required_utxos`: the utxos that must be spent regardless of `target_amount` with their
@@ -222,7 +230,7 @@ pub trait CoinSelectionAlgorithm: core::fmt::Debug {
         target_amount: u64,
         drain_script: &Script,
         rand: &mut R,
-    ) -> Result<CoinSelectionResult, InsufficientFunds>;
+    ) -> Result<CoinSelectionResult, Error>;
 }
 
 /// Simple and dumb coin selection
@@ -241,7 +249,7 @@ impl CoinSelectionAlgorithm for LargestFirstCoinSelection {
         target_amount: u64,
         drain_script: &Script,
         _: &mut R,
-    ) -> Result<CoinSelectionResult, InsufficientFunds> {
+    ) -> Result<CoinSelectionResult, Error> {
         // We put the "required UTXOs" first and make sure the optional UTXOs are sorted,
         // initially smallest to largest, before being reversed with `.rev()`.
         let utxos = {
@@ -272,7 +280,7 @@ impl CoinSelectionAlgorithm for OldestFirstCoinSelection {
         target_amount: u64,
         drain_script: &Script,
         _: &mut R,
-    ) -> Result<CoinSelectionResult, InsufficientFunds> {
+    ) -> Result<CoinSelectionResult, Error> {
         // We put the "required UTXOs" first and make sure the optional UTXOs are sorted from
         // oldest to newest according to blocktime
         // For utxo that doesn't exist in DB, they will have lowest priority to be selected
@@ -324,7 +332,7 @@ fn select_sorted_utxos(
     fee_rate: FeeRate,
     target_amount: u64,
     drain_script: &Script,
-) -> Result<CoinSelectionResult, InsufficientFunds> {
+) -> Result<CoinSelectionResult, Error> {
     let mut selected_amount = 0;
     let mut fee_amount = 0;
     let selected = utxos
@@ -349,7 +357,7 @@ fn select_sorted_utxos(
 
     let amount_needed_with_fees = target_amount + fee_amount;
     if selected_amount < amount_needed_with_fees {
-        return Err(InsufficientFunds {
+        return Err(Error::InsufficientFunds {
             needed: amount_needed_with_fees,
             available: selected_amount,
         });
@@ -413,6 +421,17 @@ enum BnbError {
     TotalTriesExceeded,
 }
 
+impl Display for BnbError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            BnbError::NoExactMatch => write!(f, "bnb: no exact, change free match found"),
+            BnbError::TotalTriesExceeded => write!(f, "bnb: total tries exceeded"),
+        }
+    }
+}
+
+impl AlgorithmError for BnbError {}
+
 impl<Cs: Default> Default for BranchAndBoundCoinSelection<Cs> {
     fn default() -> Self {
         Self {
@@ -444,7 +463,7 @@ impl<Cs: CoinSelectionAlgorithm> CoinSelectionAlgorithm for BranchAndBoundCoinSe
         target_amount: u64,
         drain_script: &Script,
         rand: &mut R,
-    ) -> Result<CoinSelectionResult, InsufficientFunds> {
+    ) -> Result<CoinSelectionResult, Error> {
         // Mapping every (UTXO, usize) to an output group
         let required_ogs: Vec<OutputGroup> = required_utxos
             .iter()
@@ -498,7 +517,7 @@ impl<Cs: CoinSelectionAlgorithm> CoinSelectionAlgorithm for BranchAndBoundCoinSe
                 );
 
                 // Add to the target the fee cost of the UTXOs
-                return Err(InsufficientFunds {
+                return Err(Error::InsufficientFunds {
                     needed: target_amount + utxo_fees,
                     available: utxo_value,
                 });
@@ -676,7 +695,7 @@ impl CoinSelectionAlgorithm for SingleRandomDraw {
         target_amount: u64,
         drain_script: &Script,
         rand: &mut R,
-    ) -> Result<CoinSelectionResult, InsufficientFunds> {
+    ) -> Result<CoinSelectionResult, Error> {
         Ok(single_random_draw(
             required_utxos,
             optional_utxos,
@@ -1522,7 +1541,7 @@ mod test {
 
         assert_matches!(
             selection,
-            Err(InsufficientFunds {
+            Err(Error::InsufficientFunds {
                 available: 300_000,
                 ..
             })
@@ -1549,7 +1568,7 @@ mod test {
 
         assert_matches!(
             selection,
-            Err(InsufficientFunds {
+            Err(Error::InsufficientFunds {
                 available: 300_010,
                 ..
             })
@@ -1572,7 +1591,7 @@ mod test {
 
         assert_matches!(
             selection,
-            Err(InsufficientFunds {
+            Err(Error::InsufficientFunds {
                 available: 300_010,
                 ..
             })
