@@ -1241,7 +1241,7 @@ impl Wallet {
 
     pub(crate) fn create_tx<Cs: coin_selection::CoinSelectionAlgorithm>(
         &mut self,
-        coin_selection: Cs,
+        coin_selection: &mut Cs,
         params: TxParams,
         rng: &mut impl RngCore,
     ) -> Result<Psbt, CreateTxError> {
@@ -1502,7 +1502,6 @@ impl Wallet {
                 fee_rate,
                 outgoing.to_sat() + fee_amount.to_sat(),
                 &drain_script,
-                rng,
             )
             .map_err(CreateTxError::CoinSelection)?;
         fee_amount += Amount::from_sat(coin_selection.fee_amount);
