@@ -256,7 +256,6 @@ jobs:
         with:
           persist-credentials: false
         # Install a recent version of clang that supports wasm32
-      - run: wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add - || exit 1
       - run: sudo apt-get update || exit 1
       - run: sudo apt-get install -y libclang-common-14-dev clang-14 libc6-dev-i386 || exit 1
       - name: Install Rust toolchain
