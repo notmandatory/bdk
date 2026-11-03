@@ -7,6 +7,17 @@ This file is updated automatically by [release-plz](https://release-plz.dev) fro
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.23.0](https://github.com/bitcoindevkit/bdk/compare/file_store-0.22.0...file_store-0.23.0) - 2026-11-03
+
+### Changed
+
+- **Breaking:** Bump `bdk_core` to `0.7.0`
+- Raise MSRV to `1.85.0` ([#2055](https://github.com/bitcoindevkit/bdk/pull/2055))
+
+### Fixed
+
+- **Breaking:** `StoreError`'s `Display` output no longer uses `Debug` formatting: the `Io` and `Bincode` messages were reworded, and `InvalidMagicBytes` now renders the expected and actual bytes as `0x`-prefixed hex ([#2083](https://github.com/bitcoindevkit/bdk/pull/2083))
+
 ## [file_store-0.22.0]
 
 ### Changed

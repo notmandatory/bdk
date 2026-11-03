@@ -7,6 +7,23 @@ This file is updated automatically by [release-plz](https://release-plz.dev) fro
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.23.0](https://github.com/bitcoindevkit/bdk/compare/esplora-0.22.1...esplora-0.23.0) - 2026-11-03
+
+### Changed
+
+- **Breaking:** Bump `bdk_core` to `0.7.0`; `CheckPoint` is generic over its data type (defaulting to `CheckPoint<BlockHash>`), and `CheckPoint::new` now takes a height and hash instead of a `BlockId` ([#1582](https://github.com/bitcoindevkit/bdk/pull/1582))
+- Bump `esplora-client` to `0.12.3` and fetch the latest blocks with `get_block_infos` instead of the deprecated `get_blocks` ([#2136](https://github.com/bitcoindevkit/bdk/pull/2136), [#2130](https://github.com/bitcoindevkit/bdk/pull/2130))
+- Raise MSRV to 1.85.0 ([#2055](https://github.com/bitcoindevkit/bdk/pull/2055))
+
+### Fixed
+
+- Treat `parallel_requests` of 0 as 1 in `full_scan` and `sync`, instead of skipping every request and returning an empty result ([#2360](https://github.com/bitcoindevkit/bdk/pull/2360))
+- Return `InvalidResponse` from `full_scan` and `sync` when the server does not advance the page cursor, instead of looping forever ([#2361](https://github.com/bitcoindevkit/bdk/pull/2361))
+- `full_scan` now scans up to the last revealed script pubkey before applying `stop_gap`, so revealed addresses are always covered ([#2182](https://github.com/bitcoindevkit/bdk/pull/2182))
+- Remove the panic from the `stop_gap` scan loop and treat `stop_gap` of 0 as 1 ([#2053](https://github.com/bitcoindevkit/bdk/pull/2053))
+- Deduplicate missing txids when fetching transactions for outpoints, avoiding repeated requests for the same transaction ([#2104](https://github.com/bitcoindevkit/bdk/pull/2104))
+- Fix `no_std` compilation by enabling the `alloc` feature of `serde_json` ([#2099](https://github.com/bitcoindevkit/bdk/pull/2099))
+
 ## [esplora-0.22.1]
 
 ### Added

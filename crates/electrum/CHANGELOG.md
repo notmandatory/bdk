@@ -7,6 +7,24 @@ This file is updated automatically by [release-plz](https://release-plz.dev) fro
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.24.0](https://github.com/bitcoindevkit/bdk/compare/electrum-0.23.2...electrum-0.24.0) - 2026-11-03
+
+### Changed
+
+- **Breaking:** Bump `bdk_core` to `0.7.0`, which makes `CheckPoint`, `SyncRequest`, and `FullScanRequest` generic over their checkpoint data (defaulting to `BlockHash`) and changes `CheckPoint::new` to take a height and hash ([#1582](https://github.com/bitcoindevkit/bdk/pull/1582))
+- Raise MSRV to `1.85.0` ([#2055](https://github.com/bitcoindevkit/bdk/pull/2055))
+
+### Fixed
+
+- Treat a `batch_size` of 0 as 1 in `full_scan` and `sync` instead of returning an empty successful response ([#2360](https://github.com/bitcoindevkit/bdk/pull/2360))
+- Return an error when the server's tip height does not fit in `u32` instead of truncating it ([#2349](https://github.com/bitcoindevkit/bdk/pull/2349))
+- Return an error when a batch response does not contain exactly one entry per request, instead of silently dropping entries or panicking on a missing header ([#2334](https://github.com/bitcoindevkit/bdk/pull/2334))
+- Propagate transport errors when syncing outpoints instead of skipping the outpoint, except for `Error::Protocol` ([#2325](https://github.com/bitcoindevkit/bdk/pull/2325))
+- Refresh the header cache with the headers fetched for the chain update, so a transaction re-mined at the same height after a reorg is re-anchored instead of reusing the stale anchor hash ([#2320](https://github.com/bitcoindevkit/bdk/pull/2320))
+- Skip `OP_RETURN` outputs when choosing the script used for history lookup by txid, falling back to the script of a spent output and skipping the transaction if no output is indexable ([#2195](https://github.com/bitcoindevkit/bdk/pull/2195))
+- Continue `full_scan` through the last-revealed index and apply `stop_gap` only to later scripts ([#2182](https://github.com/bitcoindevkit/bdk/pull/2182))
+- Verify that transactions returned by the server match the requested `Txid` in `fetch_tx` ([#2188](https://github.com/bitcoindevkit/bdk/pull/2188))
+
 ## [electrum-0.23.2]
 
 ### Added
