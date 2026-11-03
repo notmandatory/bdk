@@ -10,7 +10,7 @@ name: Release-plz
 # 1. The `release-pr` job opens/updates a release PR (branch prefix `release-plz-`)
 #    with the version bumps and changelog updates for every changed workspace
 #    crate, targeting the selected branch, authored by the
-#    `bitcoindevkit-release-plz` GitHub App. The version bump for each crate is
+#    `notmandatory-release-plz` GitHub App. The version bump for each crate is
 #    computed from that branch's Cargo.toml. Re-run it to refresh the release PR
 #    after new commits land on the branch.
 # 2. The `release` job checks whether the release PR has been merged. If so, it
