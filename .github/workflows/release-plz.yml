@@ -39,7 +39,7 @@ jobs:
   release-pr:
     name: Create/Update Rust Release PR
     runs-on: ubuntu-latest
-    if: ${{ github.repository_owner == 'bitcoindevkit' }}
+    if: ${{ github.repository_owner == 'notmandatory' }}
     permissions:
       contents: write # push the release PR branch
       pull-requests: write # open and update the release PR
@@ -83,7 +83,7 @@ jobs:
   release:
     name: Publish Rust Release
     runs-on: ubuntu-latest
-    if: ${{ github.repository_owner == 'bitcoindevkit' }}
+    if: ${{ github.repository_owner == 'notmandatory' }}
     environment: release
     permissions:
       contents: write # push tags and create GitHub releases
