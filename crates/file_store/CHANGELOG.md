@@ -7,6 +7,21 @@ This file is updated automatically by [release-plz](https://release-plz.dev) fro
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.23.0](https://github.com/notmandatory/bdk/compare/file_store-0.22.0...file_store-0.23.0) - 2026-11-11
+
+### Fixed
+
+- *(file_store)* [**breaking**] remove Debug usage and implement Display for StoreError.
+
+### Other
+
+- update release process for release-plz
+- Merge bitcoindevkit/bdk#2012: Add functions to test persistence
+- *(file_store)* correct Store creation and recovery guidance
+- *(file_store)* test `Store` persistence with `assert_persist_changesets`
+- use `core::error::Error`
+- *(msrv)* bump MSRV to `1.85.0`
+
 ## [file_store-0.22.0]
 
 ### Changed
