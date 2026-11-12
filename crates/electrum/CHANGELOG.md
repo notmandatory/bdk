@@ -7,6 +7,24 @@ This file is updated automatically by [release-plz](https://release-plz.dev) fro
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.24.0](https://github.com/bitcoindevkit/bdk/compare/electrum-0.23.2...electrum-0.24.0)
+
+### Changed
+
+- **Breaking:** Update `bdk_core` to `0.7.0` ([3ec1b327](https://github.com/bitcoindevkit/bdk/commit/3ec1b327))
+- Raise MSRV to `1.85.0` ([#2055](https://github.com/bitcoindevkit/bdk/pull/2055))
+
+### Fixed
+
+- Treat a `batch_size` of `0` as `1` in `full_scan` and `sync` instead of returning empty results ([#2360](https://github.com/bitcoindevkit/bdk/pull/2360))
+- Return an error when the Electrum server's tip height exceeds `u32::MAX` instead of truncating it ([#2349](https://github.com/bitcoindevkit/bdk/pull/2349))
+- Return an error when an Electrum batch response length differs from the request instead of silently dropping results or panicking ([#2334](https://github.com/bitcoindevkit/bdk/pull/2334))
+- Propagate non-protocol errors when `sync` fetches transactions for requested outpoints ([#2325](https://github.com/bitcoindevkit/bdk/pull/2325))
+- Fix stale anchors for transactions re-mined at the same height after a reorg by refreshing cached headers during chain updates ([#2320](https://github.com/bitcoindevkit/bdk/pull/2320))
+- Fix `sync` missing confirmation updates for transactions whose first output is an unindexed `OP_RETURN` or `OP_FALSE OP_RETURN` script ([#2195](https://github.com/bitcoindevkit/bdk/pull/2195))
+- Reject transactions returned by the server when their computed txid does not match the txid requested by `fetch_tx` ([#2188](https://github.com/bitcoindevkit/bdk/pull/2188))
+- Ensure `full_scan` covers the entire revealed range before applying `stop_gap` ([#2182](https://github.com/bitcoindevkit/bdk/pull/2182))
+
 ## [electrum-0.23.2]
 
 ### Added

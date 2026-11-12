@@ -7,6 +7,22 @@ This file is updated automatically by [release-plz](https://release-plz.dev) fro
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.23.0](https://github.com/bitcoindevkit/bdk/compare/bitcoind_rpc-0.22.0...bitcoind_rpc-0.23.0)
+
+### Added
+
+- Implement `core::error::Error` for `bip158::Error` without requiring the `std` feature ([#2137](https://github.com/bitcoindevkit/bdk/pull/2137))
+
+### Changed
+
+- **Breaking:** Update `bdk_core` to `0.7.0` and migrate `Emitter::new` and `BlockEvent::checkpoint` to the generic `CheckPoint` API, exposing `CheckPoint<BlockHash>` ([#1582](https://github.com/bitcoindevkit/bdk/pull/1582), [3ec1b327](https://github.com/bitcoindevkit/bdk/commit/3ec1b327))
+- Raise MSRV to `1.85.0` ([#2055](https://github.com/bitcoindevkit/bdk/pull/2055))
+
+### Fixed
+
+- Reject fetched mempool transactions whose computed txid does not match the requested txid in `Emitter::mempool` and `Emitter::mempool_at`, returning `bitcoincore_rpc::Error::UnexpectedStructure` ([#2316](https://github.com/bitcoindevkit/bdk/pull/2316))
+- Fix `Emitter` skipping invalidated block heights and producing unconnectable checkpoints after a reorg when `start_height` is above the agreement point ([#2167](https://github.com/bitcoindevkit/bdk/pull/2167))
+
 ## [bitcoind_rpc-0.22.0]
 
 ### Fixed

@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.7.0](https://github.com/bitcoindevkit/bdk/compare/core-0.6.2...core-0.7.0)
+
+### Added
+
+- Generalize `CheckPoint<D = BlockHash>` to store block data through `ToBlockHash`, expose it with `data` and `data_ref`, and add checkpoint-data parameters to sync/full-scan requests, builders, and responses ([#1582](https://github.com/bitcoindevkit/bdk/pull/1582))
+- Add `ToBlockTime` and `CheckPoint::median_time_past` for BIP-0113 median-time-past calculations ([#2037](https://github.com/bitcoindevkit/bdk/pull/2037))
+- Add `ToBlockHash::prev_blockhash` and prev-blockhash-aware `CheckPointEntry` and `CheckPointEntryIter` iteration through `CheckPoint::entry_iter`, `to_entry`, and `into_entry` ([#2115](https://github.com/bitcoindevkit/bdk/pull/2115))
+- Add `ChainQuery`, `ChainRequest`, and `ChainResponse` for sans-I/O chain-verification tasks ([#2038](https://github.com/bitcoindevkit/bdk/pull/2038))
+- Implement `serde::Serialize` and `serde::Deserialize` for `CheckPoint`, `TxUpdate`, `SyncResponse`, and `FullScanResponse` under the `serde` feature, using non-recursive flat checkpoint serialization ([#2232](https://github.com/bitcoindevkit/bdk/pull/2232))
+- Add `Clone` and `PartialEq` implementations for `SyncResponse` and `FullScanResponse`, and `PartialEq` for `TxUpdate` ([#2417](https://github.com/bitcoindevkit/bdk/pull/2417))
+
+### Changed
+
+- **Breaking:** Change `CheckPoint::new`, `push`, `extend`, and `insert` to accept height and block data instead of `BlockId` values ([#1582](https://github.com/bitcoindevkit/bdk/pull/1582))
+- **Breaking:** Validate `prev_blockhash` links between contiguous checkpoints: `CheckPoint::push`, `extend`, and `from_blocks` reject mismatches, while `insert` evicts checkpoints invalidated by a mismatch ([#2115](https://github.com/bitcoindevkit/bdk/pull/2115))
+- Speed up `CheckPoint::get`, `range`, `floor_at`, `floor_below`, and `CheckPointIter::nth` and `last` with logarithmic pskip traversal; expose `CheckPoint::index` and `skip`, and implement `ExactSizeIterator` for `CheckPointIter` ([#2048](https://github.com/bitcoindevkit/bdk/pull/2048))
+- Split `SyncRequest` iteration into read-only `spks`, `txids`, and `outpoints` accessors and consuming `drain_spks_with_expected_txids`, `drain_txids`, and `drain_outpoints` iterators; deprecate the old `iter_*` methods ([#2236](https://github.com/bitcoindevkit/bdk/pull/2236))
+- Raise MSRV to `1.85.0` ([#2055](https://github.com/bitcoindevkit/bdk/pull/2055))
+
+### Fixed
+
+- Fix memory leaks when dropping `CheckPoint` chains ([#2056](https://github.com/bitcoindevkit/bdk/pull/2056))
+- Fix full scans applying `stop_gap` before covering all revealed scripts by tracking per-keychain indices with `FullScanRequestBuilder::last_revealed_for_keychain` and `FullScanRequest::last_revealed` ([#2182](https://github.com/bitcoindevkit/bdk/pull/2182))
+- Stop the `serde` feature from implicitly enabling `std` in `no_std` builds ([#2227](https://github.com/bitcoindevkit/bdk/pull/2227))
+- Make `SyncResponse::is_empty` and `FullScanResponse::is_empty` available for responses with custom checkpoint data types ([#2417](https://github.com/bitcoindevkit/bdk/pull/2417))
+
+### Removed
+
+- **Breaking:** Remove `CheckPoint::from_block_ids` and `CheckPoint::from_header`; use `CheckPoint::from_blocks` with generic block data instead ([#1582](https://github.com/bitcoindevkit/bdk/pull/1582))
+
 ## [core-0.6.2]
 
 ### Added

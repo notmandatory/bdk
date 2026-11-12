@@ -7,6 +7,23 @@ This file is updated automatically by [release-plz](https://release-plz.dev) fro
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.23.0](https://github.com/bitcoindevkit/bdk/compare/esplora-0.22.1...esplora-0.23.0)
+
+### Changed
+
+- **Breaking:** Bump `bdk_core` to `0.7.0` ([3ec1b327](https://github.com/bitcoindevkit/bdk/commit/3ec1b327))
+- Bump `esplora-client` to `0.12.3` ([#2136](https://github.com/bitcoindevkit/bdk/pull/2136))
+- Raise MSRV to `1.85.0` ([#2055](https://github.com/bitcoindevkit/bdk/pull/2055))
+
+### Fixed
+
+- Treat `parallel_requests` of 0 as 1 instead of silently skipping `full_scan` or `sync` requests ([#2360](https://github.com/bitcoindevkit/bdk/pull/2360))
+- Return `esplora_client::Error::InvalidResponse` from `full_scan` and `sync` when script-history pagination repeats a cursor instead of looping indefinitely ([#2361](https://github.com/bitcoindevkit/bdk/pull/2361))
+- Ensure `full_scan` covers the entire revealed range before applying `stop_gap` ([#2182](https://github.com/bitcoindevkit/bdk/pull/2182))
+- Avoid a panic when calculating the `full_scan` stop-gap boundary and treat `stop_gap` of 0 as 1 ([#2053](https://github.com/bitcoindevkit/bdk/pull/2053))
+- Deduplicate spending-transaction fetches when multiple synced outpoints have the same spender ([#2104](https://github.com/bitcoindevkit/bdk/pull/2104))
+- Fix builds with default features disabled by enabling `serde_json`'s `alloc` feature ([#2099](https://github.com/bitcoindevkit/bdk/pull/2099))
+
 ## [esplora-0.22.1]
 
 ### Added
